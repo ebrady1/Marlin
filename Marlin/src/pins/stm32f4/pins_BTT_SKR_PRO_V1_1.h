@@ -215,7 +215,8 @@
 #define HEATER_BED_PIN                      PD12  // Hotbed
 #define FAN_PIN                             PC8   // Fan0
 #define FAN1_PIN                            PE5   // Fan1
-#define FAN2_PIN                            PE6
+//ED NTE: Disabled show it will not show up on menu
+//#define FAN2_PIN                            PE6
 
 #ifndef E0_AUTO_FAN_PIN
   #define E0_AUTO_FAN_PIN               FAN1_PIN
