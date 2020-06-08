@@ -30,8 +30,6 @@
 
 #include "menu.h"
 
-#include "../../module/configuration_store.h"
-
 #if HAS_FILAMENT_SENSOR
   #include "../../feature/runout.h"
 #endif
@@ -126,6 +124,8 @@ void menu_advanced_settings();
     #include "../../module/motion.h" // for active_extruder
 
     void menu_toolchange_migration() {
+      PGM_P const msg_migrate = GET_TEXT(MSG_TOOL_MIGRATION_SWAP);
+
       START_MENU();
       BACK_ITEM(MSG_CONFIGURATION);
 
@@ -134,7 +134,6 @@ void menu_advanced_settings();
       EDIT_ITEM(uint8, MSG_TOOL_MIGRATION_END, &migration.last, 0, EXTRUDERS - 1);
 
       // Migrate to a chosen extruder
-      PGM_P const msg_migrate = GET_TEXT(MSG_TOOL_MIGRATION_SWAP);
       LOOP_L_N(s, EXTRUDERS) {
         if (s != active_extruder) {
           ACTION_ITEM_N_P(s, msg_migrate, []{
@@ -173,7 +172,7 @@ void menu_advanced_settings();
     EDIT_ITEM_FAST(float42_52, MSG_HOTEND_OFFSET_Y, &hotend_offset[1].y, -99.0, 99.0, _recalc_offsets);
     EDIT_ITEM_FAST(float42_52, MSG_HOTEND_OFFSET_Z, &hotend_offset[1].z, Z_PROBE_LOW_POINT, 10.0, _recalc_offsets);
     #if ENABLED(EEPROM_SETTINGS)
-      ACTION_ITEM(MSG_STORE_EEPROM, lcd_store_settings);
+      ACTION_ITEM(MSG_STORE_EEPROM, ui.store_settings);
     #endif
     END_MENU();
   }
@@ -182,11 +181,12 @@ void menu_advanced_settings();
 #if ENABLED(DUAL_X_CARRIAGE)
 
   void menu_idex() {
+    const bool need_g28 = !(TEST(axis_known_position, Y_AXIS) && TEST(axis_known_position, Z_AXIS));
+
     START_MENU();
     BACK_ITEM(MSG_CONFIGURATION);
 
     GCODES_ITEM(MSG_IDEX_MODE_AUTOPARK,  PSTR("M605 S1\nG28 X\nG1 X100"));
-    const bool need_g28 = !(TEST(axis_known_position, Y_AXIS) && TEST(axis_known_position, Z_AXIS));
     GCODES_ITEM(MSG_IDEX_MODE_DUPLICATE, need_g28
       ? PSTR("M605 S1\nT0\nG28\nM605 S2 X200\nG28 X\nG1 X100")                // If Y or Z is not homed, do a full G28 first
       : PSTR("M605 S1\nT0\nM605 S2 X200\nG28 X\nG1 X100")
@@ -237,9 +237,10 @@ void menu_advanced_settings();
 #endif
 
 #if ENABLED(TOUCH_MI_PROBE)
+
   void menu_touchmi() {
-    START_MENU();
     ui.defer_status_screen();
+    START_MENU();
     BACK_ITEM(MSG_CONFIGURATION);
     GCODES_ITEM(MSG_TOUCHMI_INIT, PSTR("M851 Z0\nG28\nG1 F200 Z0"));
     SUBMENU(MSG_ZPROBE_ZOFFSET, lcd_babystep_zoffset);
@@ -247,6 +248,7 @@ void menu_advanced_settings();
     GCODES_ITEM(MSG_TOUCHMI_ZTEST, PSTR("G28\nG1 F200 Z0"));
     END_MENU();
   }
+
 #endif
 
 #if ENABLED(CONTROLLER_FAN_MENU)
@@ -331,7 +333,7 @@ void menu_advanced_settings();
       EDIT_ITEM(int3, MSG_BED, &ui.preheat_bed_temp[material], BED_MINTEMP, BED_MAX_TARGET);
     #endif
     #if ENABLED(EEPROM_SETTINGS)
-      ACTION_ITEM(MSG_STORE_EEPROM, lcd_store_settings);
+      ACTION_ITEM(MSG_STORE_EEPROM, ui.store_settings);
     #endif
     END_MENU();
   }
@@ -342,6 +344,8 @@ void menu_advanced_settings();
 #endif
 
 void menu_configuration() {
+  const bool busy = printer_busy();
+
   START_MENU();
   BACK_ITEM(MSG_MAIN);
 
@@ -367,7 +371,6 @@ void menu_configuration() {
     SUBMENU(MSG_CONTROLLER_FAN, menu_controller_fan);
   #endif
 
-  const bool busy = printer_busy();
   if (!busy) {
     #if EITHER(DELTA_CALIBRATION_MENU, DELTA_AUTO_CALIBRATION)
       SUBMENU(MSG_DELTA_CALIBRATE, menu_delta_calibrate);
@@ -434,13 +437,11 @@ void menu_configuration() {
   #endif
 
   #if ENABLED(EEPROM_SETTINGS)
-    ACTION_ITEM(MSG_STORE_EEPROM, lcd_store_settings);
-    if (!busy)
-      ACTION_ITEM(MSG_LOAD_EEPROM, lcd_load_settings);
+    ACTION_ITEM(MSG_STORE_EEPROM, ui.store_settings);
+    if (!busy) ACTION_ITEM(MSG_LOAD_EEPROM, ui.load_settings);
   #endif
 
-  if (!busy)
-    ACTION_ITEM(MSG_RESTORE_DEFAULTS, []{ settings.reset(); ui.completion_feedback(); });
+  if (!busy) ACTION_ITEM(MSG_RESTORE_DEFAULTS, ui.reset_settings);
 
   END_MENU();
 }

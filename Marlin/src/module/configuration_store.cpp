@@ -37,7 +37,7 @@
  */
 
 // Change EEPROM version if the structure changes
-#define EEPROM_VERSION "V77"
+#define EEPROM_VERSION "V79"
 #define EEPROM_OFFSET 100
 
 // Check the integrity of data offsets.
@@ -135,7 +135,7 @@
 
 typedef struct { uint16_t X, Y, Z, X2, Y2, Z2, Z3, Z4, E0, E1, E2, E3, E4, E5, E6, E7; } tmc_stepper_current_t;
 typedef struct { uint32_t X, Y, Z, X2, Y2, Z2, Z3, Z4, E0, E1, E2, E3, E4, E5, E6, E7; } tmc_hybrid_threshold_t;
-typedef struct {  int16_t X, Y, Z, X2;                                                 } tmc_sgt_t;
+typedef struct {  int16_t X, Y, Z, X2, Y2, Z2, Z3, Z4;                                 } tmc_sgt_t;
 typedef struct {     bool X, Y, Z, X2, Y2, Z2, Z3, Z4, E0, E1, E2, E3, E4, E5, E6, E7; } tmc_stealth_enabled_t;
 
 // Limit an index to an array size
@@ -328,7 +328,7 @@ typedef struct SettingsDataStruct {
   //
   tmc_stepper_current_t tmc_stepper_current;            // M906 X Y Z X2 Y2 Z2 Z3 Z4 E0 E1 E2 E3 E4 E5
   tmc_hybrid_threshold_t tmc_hybrid_threshold;          // M913 X Y Z X2 Y2 Z2 Z3 Z4 E0 E1 E2 E3 E4 E5
-  tmc_sgt_t tmc_sgt;                                    // M914 X Y Z X2
+  tmc_sgt_t tmc_sgt;                                    // M914 X Y Z X2 Y2 Z2 Z3 Z4
   tmc_stealth_enabled_t tmc_stealth_enabled;            // M569 X Y Z X2 Y2 Z2 Z3 Z4 E0 E1 E2 E3 E4 E5
 
   //
@@ -389,7 +389,7 @@ typedef struct SettingsDataStruct {
 
 } SettingsData;
 
-//static_assert(sizeof(SettingsData) <= E2END + 1, "EEPROM too small to contain SettingsData!");
+//static_assert(sizeof(SettingsData) <= MARLIN_EEPROM_SIZE, "EEPROM too small to contain SettingsData!");
 
 MarlinSettings settings;
 
@@ -799,7 +799,7 @@ void MarlinSettings::postprocess() {
     {
       _FIELD_TEST(ui_preheat_hotend_temp);
 
-      #if HOTENDS && HAS_LCD_MENU
+      #if HAS_HOTEND && HAS_LCD_MENU
         const int16_t (&ui_preheat_hotend_temp)[2]  = ui.preheat_hotend_temp,
                       (&ui_preheat_bed_temp)[2]     = ui.preheat_bed_temp;
         const uint8_t (&ui_preheat_fan_speed)[2]    = ui.preheat_fan_speed;
@@ -1112,10 +1112,14 @@ void MarlinSettings::postprocess() {
     {
       tmc_sgt_t tmc_sgt{0};
       #if USE_SENSORLESS
-        TERN_(X_SENSORLESS, tmc_sgt.X = stepperX.homing_threshold());
+        TERN_(X_SENSORLESS,  tmc_sgt.X  = stepperX.homing_threshold());
         TERN_(X2_SENSORLESS, tmc_sgt.X2 = stepperX2.homing_threshold());
-        TERN_(Y_SENSORLESS, tmc_sgt.Y = stepperY.homing_threshold());
-        TERN_(Z_SENSORLESS, tmc_sgt.Z = stepperZ.homing_threshold());
+        TERN_(Y_SENSORLESS,  tmc_sgt.Y  = stepperY.homing_threshold());
+        TERN_(Y2_SENSORLESS, tmc_sgt.Y2 = stepperY2.homing_threshold());
+        TERN_(Z_SENSORLESS,  tmc_sgt.Z  = stepperZ.homing_threshold());
+        TERN_(Z2_SENSORLESS, tmc_sgt.Z2 = stepperZ2.homing_threshold());
+        TERN_(Z3_SENSORLESS, tmc_sgt.Z3 = stepperZ3.homing_threshold());
+        TERN_(Z4_SENSORLESS, tmc_sgt.Z4 = stepperZ4.homing_threshold());
       #endif
       EEPROM_WRITE(tmc_sgt);
     }
@@ -1363,9 +1367,7 @@ void MarlinSettings::postprocess() {
       }
       DEBUG_ECHO_START();
       DEBUG_ECHOLNPAIR("EEPROM version mismatch (EEPROM=", stored_ver, " Marlin=" EEPROM_VERSION ")");
-      #if HAS_LCD_MENU && DISABLED(EEPROM_AUTO_INIT)
-        LCD_MESSAGEPGM(MSG_ERR_EEPROM_VERSION);
-      #endif
+      TERN(EEPROM_AUTO_INIT,,ui.eeprom_alert_version());
       eeprom_error = true;
     }
     else {
@@ -1649,7 +1651,7 @@ void MarlinSettings::postprocess() {
       {
         _FIELD_TEST(ui_preheat_hotend_temp);
 
-        #if HOTENDS && HAS_LCD_MENU
+        #if HAS_HOTEND && HAS_LCD_MENU
           int16_t (&ui_preheat_hotend_temp)[2]  = ui.preheat_hotend_temp,
                   (&ui_preheat_bed_temp)[2]     = ui.preheat_bed_temp;
           uint8_t (&ui_preheat_fan_speed)[2]    = ui.preheat_fan_speed;
@@ -1929,9 +1931,6 @@ void MarlinSettings::postprocess() {
 
       //
       // TMC StallGuard threshold.
-      // X and X2 use the same value
-      // Y and Y2 use the same value
-      // Z, Z2, Z3 and Z4 use the same value
       //
       {
         tmc_sgt_t tmc_sgt;
@@ -1939,37 +1938,14 @@ void MarlinSettings::postprocess() {
         EEPROM_READ(tmc_sgt);
         #if USE_SENSORLESS
           if (!validating) {
-            #ifdef X_STALL_SENSITIVITY
-              #if AXIS_HAS_STALLGUARD(X)
-                stepperX.homing_threshold(tmc_sgt.X);
-              #endif
-              #if AXIS_HAS_STALLGUARD(X2) && !X2_SENSORLESS
-                stepperX2.homing_threshold(tmc_sgt.X);
-              #endif
-            #endif
+            TERN_(X_SENSORLESS,  stepperX.homing_threshold(tmc_sgt.X));
             TERN_(X2_SENSORLESS, stepperX2.homing_threshold(tmc_sgt.X2));
-            #ifdef Y_STALL_SENSITIVITY
-              #if AXIS_HAS_STALLGUARD(Y)
-                stepperY.homing_threshold(tmc_sgt.Y);
-              #endif
-              #if AXIS_HAS_STALLGUARD(Y2)
-                stepperY2.homing_threshold(tmc_sgt.Y);
-              #endif
-            #endif
-            #ifdef Z_STALL_SENSITIVITY
-              #if AXIS_HAS_STALLGUARD(Z)
-                stepperZ.homing_threshold(tmc_sgt.Z);
-              #endif
-              #if AXIS_HAS_STALLGUARD(Z2)
-                stepperZ2.homing_threshold(tmc_sgt.Z);
-              #endif
-              #if AXIS_HAS_STALLGUARD(Z3)
-                stepperZ3.homing_threshold(tmc_sgt.Z);
-              #endif
-              #if AXIS_HAS_STALLGUARD(Z4)
-                stepperZ4.homing_threshold(tmc_sgt.Z);
-              #endif
-            #endif
+            TERN_(Y_SENSORLESS,  stepperY.homing_threshold(tmc_sgt.Y));
+            TERN_(Y2_SENSORLESS, stepperY2.homing_threshold(tmc_sgt.Y2));
+            TERN_(Z_SENSORLESS,  stepperZ.homing_threshold(tmc_sgt.Z));
+            TERN_(Z2_SENSORLESS, stepperZ2.homing_threshold(tmc_sgt.Z2));
+            TERN_(Z3_SENSORLESS, stepperZ3.homing_threshold(tmc_sgt.Z3));
+            TERN_(Z4_SENSORLESS, stepperZ4.homing_threshold(tmc_sgt.Z4));
           }
         #endif
       }
@@ -2163,17 +2139,13 @@ void MarlinSettings::postprocess() {
       if (eeprom_error) {
         DEBUG_ECHO_START();
         DEBUG_ECHOLNPAIR("Index: ", int(eeprom_index - (EEPROM_OFFSET)), " Size: ", datasize());
-        #if HAS_LCD_MENU && DISABLED(EEPROM_AUTO_INIT)
-          LCD_MESSAGEPGM(MSG_ERR_EEPROM_INDEX);
-        #endif
+        TERN(EEPROM_AUTO_INIT,,ui.eeprom_alert_index());
       }
       else if (working_crc != stored_crc) {
         eeprom_error = true;
         DEBUG_ERROR_START();
         DEBUG_ECHOLNPAIR("EEPROM CRC mismatch - (stored) ", stored_crc, " != ", working_crc, " (calculated)!");
-        #if HAS_LCD_MENU && DISABLED(EEPROM_AUTO_INIT)
-          LCD_MESSAGEPGM(MSG_ERR_EEPROM_CRC);
-        #endif
+        TERN(EEPROM_AUTO_INIT,,ui.eeprom_alert_crc());
       }
       else if (!validating) {
         DEBUG_ECHO_START();
@@ -2557,7 +2529,7 @@ void MarlinSettings::reset() {
   // Preheat parameters
   //
 
-  #if HOTENDS && HAS_LCD_MENU
+  #if HAS_HOTEND && HAS_LCD_MENU
     ui.preheat_hotend_temp[0] = PREHEAT_1_TEMP_HOTEND;
     ui.preheat_hotend_temp[1] = PREHEAT_2_TEMP_HOTEND;
     ui.preheat_bed_temp[0] = PREHEAT_1_TEMP_BED;
@@ -3077,7 +3049,7 @@ void MarlinSettings::reset() {
 
     #endif // [XYZ]_DUAL_ENDSTOPS
 
-    #if HOTENDS && HAS_LCD_MENU
+    #if HAS_HOTEND && HAS_LCD_MENU
 
       CONFIG_ECHO_HEADING("Material heatup parameters:");
       LOOP_L_N(i, COUNT(ui.preheat_hotend_temp)) {
@@ -3233,6 +3205,7 @@ void MarlinSettings::reset() {
         #if AXIS_IS_TMC(Z)
           SERIAL_ECHOPAIR_P(SP_Z_STR, stepperZ.getMilliamps());
         #endif
+        SERIAL_EOL();
       #endif
 
       #if AXIS_IS_TMC(X2) || AXIS_IS_TMC(Y2) || AXIS_IS_TMC(Z2)
@@ -3247,6 +3220,7 @@ void MarlinSettings::reset() {
         #if AXIS_IS_TMC(Z2)
           SERIAL_ECHOPAIR_P(SP_Z_STR, stepperZ2.getMilliamps());
         #endif
+        SERIAL_EOL();
       #endif
 
       #if AXIS_IS_TMC(Z3)
@@ -3300,34 +3274,30 @@ void MarlinSettings::reset() {
         CONFIG_ECHO_HEADING("Hybrid Threshold:");
         #if AXIS_HAS_STEALTHCHOP(X) || AXIS_HAS_STEALTHCHOP(Y) || AXIS_HAS_STEALTHCHOP(Z)
           say_M913(forReplay);
-        #endif
-        #if AXIS_HAS_STEALTHCHOP(X)
-          SERIAL_ECHOPAIR_P(SP_X_STR, stepperX.get_pwm_thrs());
-        #endif
-        #if AXIS_HAS_STEALTHCHOP(Y)
-          SERIAL_ECHOPAIR_P(SP_Y_STR, stepperY.get_pwm_thrs());
-        #endif
-        #if AXIS_HAS_STEALTHCHOP(Z)
-          SERIAL_ECHOPAIR_P(SP_Z_STR, stepperZ.get_pwm_thrs());
-        #endif
-        #if AXIS_HAS_STEALTHCHOP(X) || AXIS_HAS_STEALTHCHOP(Y) || AXIS_HAS_STEALTHCHOP(Z)
+          #if AXIS_HAS_STEALTHCHOP(X)
+            SERIAL_ECHOPAIR_P(SP_X_STR, stepperX.get_pwm_thrs());
+          #endif
+          #if AXIS_HAS_STEALTHCHOP(Y)
+            SERIAL_ECHOPAIR_P(SP_Y_STR, stepperY.get_pwm_thrs());
+          #endif
+          #if AXIS_HAS_STEALTHCHOP(Z)
+            SERIAL_ECHOPAIR_P(SP_Z_STR, stepperZ.get_pwm_thrs());
+          #endif
           SERIAL_EOL();
         #endif
 
         #if AXIS_HAS_STEALTHCHOP(X2) || AXIS_HAS_STEALTHCHOP(Y2) || AXIS_HAS_STEALTHCHOP(Z2)
           say_M913(forReplay);
           SERIAL_ECHOPGM(" I1");
-        #endif
-        #if AXIS_HAS_STEALTHCHOP(X2)
-          SERIAL_ECHOPAIR_P(SP_X_STR, stepperX2.get_pwm_thrs());
-        #endif
-        #if AXIS_HAS_STEALTHCHOP(Y2)
-          SERIAL_ECHOPAIR_P(SP_Y_STR, stepperY2.get_pwm_thrs());
-        #endif
-        #if AXIS_HAS_STEALTHCHOP(Z2)
-          SERIAL_ECHOPAIR_P(SP_Z_STR, stepperZ2.get_pwm_thrs());
-        #endif
-        #if AXIS_HAS_STEALTHCHOP(X2) || AXIS_HAS_STEALTHCHOP(Y2) || AXIS_HAS_STEALTHCHOP(Z2)
+          #if AXIS_HAS_STEALTHCHOP(X2)
+            SERIAL_ECHOPAIR_P(SP_X_STR, stepperX2.get_pwm_thrs());
+          #endif
+          #if AXIS_HAS_STEALTHCHOP(Y2)
+            SERIAL_ECHOPAIR_P(SP_Y_STR, stepperY2.get_pwm_thrs());
+          #endif
+          #if AXIS_HAS_STEALTHCHOP(Z2)
+            SERIAL_ECHOPAIR_P(SP_Z_STR, stepperZ2.get_pwm_thrs());
+          #endif
           SERIAL_EOL();
         #endif
 
