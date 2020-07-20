@@ -426,7 +426,7 @@
 #define TEMP_SENSOR_5 0
 #define TEMP_SENSOR_6 0
 #define TEMP_SENSOR_7 0
-#define TEMP_SENSOR_BED 0
+#define TEMP_SENSOR_BED 11
 #define TEMP_SENSOR_PROBE 0
 #define TEMP_SENSOR_CHAMBER 0
 
@@ -649,7 +649,7 @@
   //#define ENDSTOPPULLUP_ZMAX
   //#define ENDSTOPPULLUP_XMIN
   //#define ENDSTOPPULLUP_YMIN
-  //#define ENDSTOPPULLUP_ZMIN
+  #define ENDSTOPPULLUP_ZMIN
   //#define ENDSTOPPULLUP_ZMIN_PROBE
 #endif
 
@@ -663,7 +663,7 @@
   //#define ENDSTOPPULLDOWN_XMIN
   //#define ENDSTOPPULLDOWN_YMIN
   //#define ENDSTOPPULLDOWN_ZMIN
-  //#define ENDSTOPPULLDOWN_ZMIN_PROBE
+  #define ENDSTOPPULLDOWN_ZMIN_PROBE
 #endif
 
 // Mechanical endstop with COM to ground and NC to Signal uses "false" here (most common setup).
@@ -758,7 +758,7 @@
  * Override with M203
  *                                      X, Y, Z, E0 [, E1[, E2...]]
  */
-#define DEFAULT_MAX_FEEDRATE          { 300, 300, 20, 25 }
+#define DEFAULT_MAX_FEEDRATE          { 600, 600, 12, 120}
 
 //#define LIMITED_MAX_FR_EDITING        // Limit edit via M203 or LCD to DEFAULT_MAX_FEEDRATE * 2
 #if ENABLED(LIMITED_MAX_FR_EDITING)
@@ -893,9 +893,9 @@
  * A Fix-Mounted Probe either doesn't deploy or needs manual deployment.
  *   (e.g., an inductive probe or a nozzle-based probe-switch.)
  */
-#define FIX_MOUNTED_PROBE
+//#define FIX_MOUNTED_PROBE
 
-/**
+/*8*
  * Use the nozzle as the probe, as with a conductive
  * nozzle system or a piezo-electric smart effector.
  */
@@ -910,7 +910,7 @@
 /**
  * The BLTouch probe uses a Hall effect sensor and emulates a servo.
  */
-//#define BLTOUCH
+#define BLTOUCH
 
 /**
  * Pressure sensor with a BLTouch-like interface
@@ -987,20 +987,22 @@
  *
  * Specify a Probe position as { X, Y, Z }
  */
-#define NOZZLE_TO_PROBE_OFFSET { 0, 0, 0.2 }
+#define NOZZLE_TO_PROBE_OFFSET { 18, 28, -4 }
 
 // Most probes should stay away from the edges of the bed, but
 // with NOZZLE_AS_PROBE this can be negative for a wider probing area.
-#define PROBING_MARGIN 10
+#define PROBING_MARGIN 5
 
 // X and Y axis travel speed (mm/m) between probes
-#define XY_PROBE_SPEED 8000
+//#define XY_PROBE_SPEED 8000
+#define XY_PROBE_SPEED 16000
 
 // Feedrate (mm/m) for the first approach when double-probing (MULTIPLE_PROBING == 2)
 #define Z_PROBE_SPEED_FAST HOMING_FEEDRATE_Z
 
 // Feedrate (mm/m) for the "accurate" probe of each point
-#define Z_PROBE_SPEED_SLOW (Z_PROBE_SPEED_FAST / 2)
+#define Z_PROBE_SPEED_SLOW (250)
+//#define Z_PROBE_SPEED_SLOW (Z_PROBE_SPEED_FAST / 2)
 //#define Z_PROBE_SPEED_SLOW (Z_PROBE_SPEED_FAST / 4)
 
 /**
@@ -1029,12 +1031,12 @@
  * Example: `M851 Z-5` with a CLEARANCE of 4  =>  9mm from bed to nozzle.
  *     But: `M851 Z+1` with a CLEARANCE of 2  =>  2mm from bed to nozzle.
  */
-#define Z_CLEARANCE_DEPLOY_PROBE   10 // Z Clearance for Deploy/Stow
-#define Z_CLEARANCE_BETWEEN_PROBES  5 // Z Clearance between probe points
-#define Z_CLEARANCE_MULTI_PROBE     5 // Z Clearance between multiple probes
+#define Z_CLEARANCE_DEPLOY_PROBE   7 // Z Clearance for Deploy/Stow
+#define Z_CLEARANCE_BETWEEN_PROBES  2 // Z Clearance between probe points
+#define Z_CLEARANCE_MULTI_PROBE     2 // Z Clearance between multiple probes
 //#define Z_AFTER_PROBING           5 // Z position after probing is done
 
-#define Z_PROBE_LOW_POINT          -4 // Farthest distance below the trigger-point to go before stopping
+#define Z_PROBE_LOW_POINT          -5 // Farthest distance below the trigger-point to go before stopping
 
 // For M851 give a range for adjusting the Z probe offset
 #define Z_PROBE_OFFSET_RANGE_MIN -20
@@ -1062,7 +1064,7 @@
 #endif
 //#define PROBING_FANS_OFF          // Turn fans off when probing
 //#define PROBING_STEPPERS_OFF      // Turn steppers off (unless needed to hold position) when probing
-#define DELAY_BEFORE_PROBING 500 // (ms) To prevent vibrations from triggering piezo sensors
+#define DELAY_BEFORE_PROBING 100 // (ms) To prevent vibrations from triggering piezo sensors
 
 // For Inverting Stepper Enable Pins (Active Low) use 0, Non Inverting (Active High) use 1
 // :{ 0:'Low', 1:'High' }
@@ -1133,7 +1135,7 @@
 #define Z_MIN_POS 0
 #define X_MAX_POS 275 
 #define Y_MAX_POS 290 
-#define Z_MAX_POS 295 
+#define Z_MAX_POS 285 
 
 /**
  * Software Endstops
@@ -1400,8 +1402,7 @@
 
 // Homing speeds (mm/m)
 #define HOMING_FEEDRATE_XY (50*60)
-//#define HOMING_FEEDRATE_Z  (4*60)
-#define HOMING_FEEDRATE_Z  (8*60)
+#define HOMING_FEEDRATE_Z  (12*60)
 
 // Validate that endstops are triggered on homing moves
 #define VALIDATE_HOMING_ENDSTOPS
@@ -2304,7 +2305,7 @@
  * Set this manually if there are extra servos needing manual control.
  * Leave undefined or set to 0 to entirely disable the servo subsystem.
  */
-//#define NUM_SERVOS 3 // Servo index starts with 0 for M280 command
+#define NUM_SERVOS 1 // Servo index starts with 0 for M280 command
 
 // (ms) Delay  before the next move will start, to give the servo time to reach its target angle.
 // 300ms is a good value but you can try less delay.
